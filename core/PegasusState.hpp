@@ -122,10 +122,6 @@ namespace pegasus
 
         using Reservation = sparta::utils::ValidValue<Addr>;
 
-        Reservation & getReservation() { return reservation_; }
-
-        const Reservation & getReservation() const { return reservation_; }
-
         template <typename XLEN> void changeMMUMode();
 
         struct SimState
@@ -226,6 +222,24 @@ namespace pegasus
             return csr_rset_->getRegister(reg_num);
         }
 
+        sparta::Register* findRegister(const RegId reg_id)
+        {
+            switch (reg_id.reg_type)
+            {
+                case RegType::INTEGER:
+                    return getIntRegister(reg_id.reg_num);
+                case RegType::FLOATING_POINT:
+                    return getFpRegister(reg_id.reg_num);
+                case RegType::VECTOR:
+                    return getVecRegister(reg_id.reg_num);
+                case RegType::CSR:
+                    return getCsrRegister(reg_id.reg_num);
+                case RegType::INVALID:
+                    sparta_assert(false, "Invalid register type!");
+            }
+            return nullptr;
+        }
+
         sparta::Register* findRegister(const std::string & reg_name, bool must_exist = true) const;
 
         template <typename MemoryType> MemoryType readMemory(const Addr paddr);
@@ -236,7 +250,7 @@ namespace pegasus
 
         const std::vector<std::unique_ptr<Observer>> & getObservers() const { return observers_; }
 
-        void insertExecuteActions(ActionGroup* action_group);
+        void insertExecuteActions(ActionGroup* action_group, const bool is_memory_inst);
 
         ActionGroup* getFinishActionGroup() { return &finish_action_group_; }
 
@@ -337,9 +351,6 @@ namespace pegasus
 
         //! Current exception code
         uint64_t current_exception_ = std::numeric_limits<ExcpCode>::max();
-
-        //! LR/SC Reservations
-        Reservation reservation_;
 
         //! Simulation state
         SimState sim_state_;
