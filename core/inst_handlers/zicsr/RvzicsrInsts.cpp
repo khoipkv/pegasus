@@ -590,8 +590,9 @@ namespace pegasus
     Action::ItrType RvzicsrInsts::tvecUpdateHandler_(pegasus::PegasusState* state,
                                                      Action::ItrType action_it)
     {
-        const XLEN mode_val = READ_CSR_FIELD<XLEN>(state, TVEC_CSR_ADDR, "mode");
-        if (!state->getCore()->isTrapModeSupported((int)mode_val))
+        const TrapVectorMode mode_val =
+            (TrapVectorMode)READ_CSR_FIELD<XLEN>(state, TVEC_CSR_ADDR, "mode");
+        if (!state->getCore()->isTrapModeSupported(mode_val))
         {
             WRITE_CSR_FIELD<XLEN>(state, TVEC_CSR_ADDR, "mode", 0);
         }

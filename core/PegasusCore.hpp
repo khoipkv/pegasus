@@ -88,12 +88,8 @@ namespace pegasus
 
         bool isTrapModeSupported(const TrapVectorMode mode) const
         {
-            for (auto m : supported_trap_modes_)
-            {
-                if ((TrapVectorMode) m == mode)
-                    return true;
-            }
-            return false;
+            const auto & modes = supported_trap_modes_;
+            return std::find(modes.begin(), modes.end(), static_cast<int>(mode)) != modes.end();
         }
 
         uint64_t getXlen() const { return xlen_; }
