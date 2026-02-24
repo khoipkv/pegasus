@@ -54,7 +54,6 @@ namespace pegasus
         Action::ItrType misaUpdateHandler_(pegasus::PegasusState* state, Action::ItrType action_it);
 
         template <typename XLEN>
-        Action::ItrType mtvecUpdateHandler_(pegasus::PegasusState* state,
-                                            Action::ItrType action_it);
+        Action::ItrType tvecUpdateHandler_(pegasus::PegasusState* state, Action::ItrType action_it);
     };
 } // namespace pegasus

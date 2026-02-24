@@ -86,11 +86,11 @@ namespace pegasus
             return supported_priv_modes_.contains(mode);
         }
 
-        bool isTrapModeSupported(const int mode) const
+        bool isTrapModeSupported(const TrapVectorMode mode) const
         {
-            for (int m : supported_trap_modes_)
+            for (auto m : supported_trap_modes_)
             {
-                if (m == mode)
+                if ((TrapVectorMode) m == mode)
                     return true;
             }
             return false;
