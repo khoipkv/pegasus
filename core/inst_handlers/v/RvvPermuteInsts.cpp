@@ -177,6 +177,29 @@ namespace pegasus
     template void RvvPermuteInsts::getInstHandlers<RV32>(std::map<std::string, Action> &);
     template void RvvPermuteInsts::getInstHandlers<RV64>(std::map<std::string, Action> &);
 
+    /**
+     * @brief Helper function to handle RISC-V vector move instructions between element 0 and scalar
+     * registers.
+     *
+     * This function supports all RISC-V vector move instructions that involve moving data
+     * between element 0 of a vector register and scalar registers. It handles instructions
+     * such as `vmv.x.s` (move element 0 to a scalar register) and `vmv.s.x` (move a scalar
+     * value to element 0 of a vector register). The operation is determined by the specific
+     * instruction being executed.
+     *
+     * @tparam XLEN The width of the scalar registers (e.g., 32 or 64 bits). Determines the size of
+     * scalar values used in operations.
+     * @tparam elemWidth The width of each vector element (e.g., 16, 32, or 64 bits). Specifies the
+     * size of the floating-point elements in the vector register.
+     * @tparam opMode Specifies the operand mode for the operation. Determines the source of the
+     * second operand:
+     *                - Immediate Mode: The second operand is an immediate constant.
+     *                - Scalar Register Mode: The second operand is loaded from a scalar register.
+     *                - Vector Mode: The second operand is another vector register.
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <typename XLEN, size_t elemWidth, OperandMode opMode>
     Action::ItrType vmvHelper(pegasus::PegasusState* state, Action::ItrType action_it)
     {
@@ -256,6 +279,31 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Helper function to handle RISC-V vector slide instructions.
+     *
+     * This function implements the behavior of RISC-V vector slide instructions, such as
+     * `vslideup.vx`, `vslideup.vi`, `vslidedown.vx`, and `vslidedown.vi`. These instructions
+     * shift elements within a vector register up or down by a specified amount.
+     *
+     * The operation is applied element-wise across the vector register, and the specific
+     * behavior (e.g., slide up or slide down) is determined by the instruction being executed.
+     *
+     * @tparam XLEN The width of the scalar registers (e.g., 32 or 64 bits). Determines the size of
+     * scalar values used in operations.
+     * @tparam elemWidth The width of each vector element (e.g., 16, 32, or 64 bits). Specifies the
+     * size of the floating-point elements in the vector register.
+     * @tparam opMode Specifies the operand mode for the operation. Determines the source of the
+     * second operand:
+     *                - Immediate Mode: The second operand is an immediate constant.
+     *                - Scalar Register Mode: The second operand is loaded from a scalar register.
+     *                - Vector Mode: The second operand is another vector register.
+     * @tparam isUp A boolean template parameter that indicates the direction of the slide. If
+     * `true`, the elements are slid up; if `false`, they are slid down.
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <typename XLEN, size_t elemWidth, OperandMode opMode, bool isUp>
     Action::ItrType vslideHelper(PegasusState* state, Action::ItrType action_it)
     {
@@ -333,6 +381,25 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the RISC-V `vslide1` instruction, which performs a single-element slide
+     * operation.
+     *
+     * This function implements the `vslide1` instruction, which shifts elements within a vector
+     * register up or down by one position. The direction of the slide (up or down) is determined by
+     * the `isUp` template parameter. The operation is applied element-wise across the vector
+     * register, and the vacated position is filled with the value from the neighboring element.
+     *
+     * @tparam XLEN The width of the scalar registers (e.g., 32 or 64 bits).
+     * @tparam elemWidth The width of each vector element (e.g., 8, 16, 32, or 64 bits).
+     * @tparam opMode The operand mode, which determines the source of the slide (e.g., vector or
+     * scalar).
+     * @tparam isUp A boolean indicating the direction of the slide (`true` for up, `false` for
+     * down).
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <typename XLEN, size_t elemWidth, OperandMode opMode, bool isUp>
     Action::ItrType vslide1Helper(PegasusState* state, Action::ItrType action_it)
     {
@@ -445,6 +512,38 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the RISC-V `vrgather` instructions (`vrgather.vi`, `vrgather.vx`,
+     * `vrgather.vv`), which perform vector element gathering.
+     *
+     * This function implements the `vrgather` family of instructions, including:
+     * - `vrgather.vi`: Gathers elements from a source vector register based on an immediate index.
+     * - `vrgather.vx`: Gathers elements from a source vector register based on indices provided in
+     * a scalar register.
+     * - `vrgather.vv`: Gathers elements from a source vector register based on indices provided in
+     * another vector register.
+     *
+     * The operation is applied element-wise, and the gathered elements are stored in the
+     * destination vector register. If an index is out of bounds (i.e., greater than or equal to the
+     * number of elements in the source vector), the corresponding destination element is set to
+     * `0`. Masking can be applied to conditionally perform the operation on specific elements based
+     * on the active mask bits.
+     *
+     * @tparam XLEN The width of the scalar registers (e.g., 32 or 64 bits). Determines the size of
+     * scalar values used in operations.
+     * @tparam elemWidth The width of each vector element (e.g., 16, 32, or 64 bits). Specifies the
+     * size of the floating-point elements in the vector register.
+     * @tparam opMode Specifies the operand mode for the operation. Determines the source of the
+     * second operand:
+     *                - Immediate Mode: The second operand is an immediate constant.
+     *                - Scalar Register Mode: The second operand is loaded from a scalar register.
+     *                - Vector Mode: The second operand is another vector register.
+     * @tparam isIndex16 A boolean template parameter that indicates whether the indices are 16-bit
+     * values (true) or the same width as the vector elements (false).
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <typename XLEN, size_t elemWidth, OperandMode opMode, bool is16>
     Action::ItrType vrgatherHelper(PegasusState* state, Action::ItrType action_it)
     {
@@ -519,6 +618,19 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the RISC-V `vcompress` instruction, which performs active element compression.
+     *
+     * This function implements the `vcompress` instruction, which compresses elements from a source
+     * vector register into a destination vector register based on the active mask bits in the mask
+     * register `v0`. Only elements corresponding to active mask bits (`1`) are selected and stored
+     * contiguously in the destination vector register. The operation is applied element-wise across
+     * the vector registers.
+     *
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <size_t elemWidth>
     Action::ItrType vcompressHelper(PegasusState* state, Action::ItrType action_it)
     {
@@ -564,6 +676,21 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the RISC-V `vmv?r.v` instruction, which performs whole register element
+     * movement.
+     *
+     * The operation is unconditional and moves all elements from the source vector to the
+     * destination vector.
+     *
+     * @tparam elemCount The number of elements to move, determined by the specific instruction
+     * variant (e.g., 1, 2, 4, or 8).
+     * @tparam nRegs The number of vector registers involved in the operation, determined by the
+     * specific instruction variant (e.g., 1 for `vmv1r.v`, 2 for `vmv2r.v`, etc.).
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <size_t elemWidth, size_t nReg>
     Action::ItrType vmvrHelper(PegasusState* state, Action::ItrType action_it)
     {
