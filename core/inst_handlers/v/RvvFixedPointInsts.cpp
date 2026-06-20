@@ -327,17 +327,39 @@ namespace pegasus
     template void RvvFixedPointInsts::getInstHandlers<RV32>(std::map<std::string, Action> &);
     template void RvvFixedPointInsts::getInstHandlers<RV64>(std::map<std::string, Action> &);
 
+    /**
+     * @brief Helper function to perform binary operations between vector and scalar registers.
+     *
+     * This function executes a binary operation between elements of a vector register
+     * and a scalar value from an integer register or elements of vector register. The result
+     * is stored in the destination vector register. The operation is applied element-wise
+     * across the vector.
+     * The example insturcionts include "vnclipu.wi", "vssra.vv", "vssub.vx" etc.
+     *
+     * @tparam XLEN The width of the scalar registers (e.g., 32 or 64 bits).
+     * @tparam elemWidth The width of each vector element (e.g., 8, 16, 32, or 64 bits).
+     * @tparam opMode Specifies the type of the second operand, which determines whether the
+     *         second operand is an immediate value, a scalar register, or another vector.
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <typename XLEN, size_t elemWidth, OperandMode opMode, typename Functor>
     Action::ItrType vxBinaryHelper(pegasus::PegasusState* state, Action::ItrType action_it)
     {
         const PegasusInstPtr & inst = state->getCurrentInst();
         auto elems_vs2 =
             Elements<Element<opMode.src2 == OperandMode::Mode::W ? 2 * elemWidth : elemWidth>,
-                     false>{state, inst->getVectorConfig(), inst->getRs1()};
-        auto elems_vs1 = opMode.src1 != OperandMode::Mode::V
-                             ? Elements<Element<elemWidth>, false>{}
-                             : Elements<Element<elemWidth>, false>{state, inst->getVectorConfig(),
-                                                                   inst->getRs1()};
+                     false>{state, inst->getVectorConfig(), inst->getRs2()};
+
+        // If operation mode is immediate, we don't care about rs1.
+        // Need conditional to avoid getting an invalid Rs1
+        const uint32_t rs1_val = (opMode.src1 == OperandMode::Mode::I) ? 0 : inst->getRs1();
+
+        auto elems_vs1 =
+            opMode.src1 != OperandMode::Mode::V
+                ? Elements<Element<elemWidth>, false>{}
+                : Elements<Element<elemWidth>, false>{state, inst->getVectorConfig(), rs1_val};
         auto elems_vd =
             Elements<Element<elemWidth>, false>{state, inst->getVectorConfig(), inst->getRd()};
         using S = typename decltype(elems_vs2)::ElemType::ValueType;
@@ -362,7 +384,7 @@ namespace pegasus
                 {
                     elems_vd.getElement(index).setVal(static_cast<R>(
                         functor(elems_vs2.getElement(index).getVal(),
-                                static_cast<S>(READ_INT_REG<XLEN>(state, inst->getRs1())))));
+                                static_cast<S>(READ_INT_REG<XLEN>(state, rs1_val)))));
                 }
                 else // opMode.src1 == OperandMode::Mode::I
                 {

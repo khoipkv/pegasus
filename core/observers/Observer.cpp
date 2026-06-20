@@ -100,16 +100,16 @@ namespace pegasus
                     // (m2,m4,m8,mf2...)
                     if (getRegId(reg).reg_type == RegType::VECTOR)
                     {
-                        uint32_t encoded_lmul =
+                        const uint32_t encoded_lmul =
                             state->getCurrentInst()->getVectorConfig()->getLMUL();
-                        uint32_t reg_count =
+                        const uint32_t reg_count =
                             std::max(1u, encoded_lmul / 8); // works well for fractional lmul cases
 
-                        uint32_t base = getRegId(reg).reg_num;
+                        const uint32_t base = getRegId(reg).reg_num;
 
                         for (uint32_t i = 0; i < reg_count; ++i)
                         {
-                            uint32_t phys = base + i;
+                            const uint32_t phys = base + i;
 
                             src.lmul_values.push_back(makeVectorRegValue(readVectorRegister_(
                                 state, RegId{RegType::VECTOR, phys, "V" + std::to_string(phys)})));

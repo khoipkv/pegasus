@@ -605,6 +605,28 @@ namespace pegasus
     template void RvvLoadStoreInsts::getInstHandlers<RV32>(std::map<std::string, Action> &);
     template void RvvLoadStoreInsts::getInstHandlers<RV64>(std::map<std::string, Action> &);
 
+    /**
+     * @brief Handles the computation of addresses for vector load-store strided instructions.
+     *
+     * This function computes the memory addresses for vector load or store operations
+     * with a strided access pattern. The base address and stride are used to calculate
+     * the memory addresses for each element in the vector. The computed addresses are
+     * stored in the appropriate state for subsequent memory operations.
+     *
+     * @tparam XLEN The width of the scalar registers (e.g., RV32 or RV64). Determines the size of
+     * scalar values used in the computation.
+     * @tparam elemWidth The width of each vector element (e.g., 8, 16, 32, or 64 bits). Specifies
+     * the size of the vector elements being accessed.
+     * @tparam addrMode The addressing mode used for the operation. Determines how memory addresses
+     * are computed:
+     *                  - `AddressingMode::UNIT`: Unit-stride addressing.
+     *                  - `AddressingMode::STRIDED`: Strided addressing.
+     * @tparam ffirst A boolean indicating whether the operation uses the "fault-only-first" mode
+     * (`true`) or not (`false`). In this mode, only the first faulting memory access is reported.
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <typename XLEN, size_t elemWidth, RvvLoadStoreInsts::AddressingMode addrMode,
               bool ffirst>
     Action::ItrType RvvLoadStoreInsts::vlseComputeAddressHandler_(pegasus::PegasusState* state,
@@ -654,6 +676,26 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the computation of stride indices for vector load-store indexed instructions.
+     *
+     * This function selects stride indices from the vector register `vs2` based on the mask
+     * register `v0`. For each element, if the corresponding bit in the mask register `v0` is set,
+     * the stride index is selected from `vs2`. The selected stride indices are used to compute
+     * memory addresses for vector load or store operations.
+     *
+     * @tparam XLEN The width of the scalar registers (e.g., RV32 or RV64). Determines the size of
+     * scalar values used in the computation.
+     * @tparam elemWidth The width of each vector element (e.g., 8, 16, 32, or 64 bits). Specifies
+     * the size of the vector elements being accessed.
+     * @tparam addrMode The addressing mode used for the operation. Determines how memory addresses
+     * are computed:
+     *                  - `AddressingMode::UNIT`: Unit-stride addressing.
+     *                  - `AddressingMode::STRIDED`: Strided addressing.
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <typename XLEN, size_t elemWidth, RvvLoadStoreInsts::AddressingMode addrMode>
     Action::ItrType RvvLoadStoreInsts::vlseIdxComputeAddressHandler_(pegasus::PegasusState* state,
                                                                      Action::ItrType action_it)
@@ -688,6 +730,22 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Computes memory addresses for vector load-store operations starting from `rs1`.
+     *
+     * This function calculates the memory addresses for vector load or store operations
+     * for the entire vector register group. The computation starts from the base address
+     * provided in the scalar register `rs1`. The calculated addresses are used for
+     * subsequent memory operations on the vector register group.
+     *
+     * @tparam XLEN The width of the scalar registers (e.g., RV32 or RV64). Determines the size of
+     * scalar values used in the computation.
+     * @tparam elemWidth The width of each vector element (e.g., 8, 16, 32, or 64 bits). Specifies
+     * the size of the vector elements being accessed.
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <typename XLEN, size_t elemWidth>
     Action::ItrType RvvLoadStoreInsts::vlsreComputeAddressHandler_(pegasus::PegasusState* state,
                                                                    Action::ItrType action_it)
@@ -729,6 +787,22 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the vector load store (`vlse`) instruction.
+     *
+     * This function performs the vector load store operation.
+     *
+     * @tparam elemWidth The width of each vector element (e.g., 8, 16, 32, or 64 bits). Specifies
+     * the size of the vector elements being accessed.
+     * @tparam isLoad A boolean template parameter that indicates whether the operation is a load
+     * (`true`) or store (`false`).
+     * @tparam ffirst A boolean template parameter that indicates whether the operation uses the
+     * "fault-only-first" mode (`true`) or not (`false`). In this mode, only the first faulting
+     * memory access is reported.
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <size_t elemWidth, bool isLoad, bool ffirst>
     Action::ItrType RvvLoadStoreInsts::vlseHandler_(pegasus::PegasusState* state,
                                                     Action::ItrType action_it)
@@ -812,6 +886,17 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the vector load store register group instruction.
+     *
+     * @tparam elemWidth The width of each vector element (e.g., 8, 16, 32, or 64 bits). Specifies
+     * the size of the vector elements being accessed.
+     * @tparam isLoad A boolean template parameter that indicates whether the operation is a load
+     * (`true`) or store (`false`).
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <size_t elemWidth, bool isLoad>
     Action::ItrType RvvLoadStoreInsts::vlsreHandler_(pegasus::PegasusState* state,
                                                      Action::ItrType action_it)
@@ -852,6 +937,15 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the vector mask load store instruction.
+     *
+     * @tparam isLoad A boolean template parameter that indicates whether the operation is a load
+     * (`true`) or store (`false`).
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <bool isLoad>
     Action::ItrType RvvLoadStoreInsts::vlsmHandler_(pegasus::PegasusState* state,
                                                     Action::ItrType action_it)

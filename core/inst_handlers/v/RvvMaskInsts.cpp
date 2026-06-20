@@ -95,6 +95,20 @@ namespace pegasus
     template void RvvMaskInsts::getInstHandlers<RV32>(std::map<std::string, Action> &);
     template void RvvMaskInsts::getInstHandlers<RV64>(std::map<std::string, Action> &);
 
+    /**
+     * @brief Handles the vector mask logical (`ml`) instruction.
+     *
+     * This function performs logical operations on vector mask registers. The operation
+     * is applied element-wise across the mask registers, and the result is stored in the
+     * destination mask register. The specific logical operation (e.g., AND, OR, XOR)
+     * is determined by the instruction.
+     *
+     * @tparam func A template parameter that specifies the logical operation to be applied. It is a
+     * function that takes two mask element values and returns the result of the logical operation.
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <auto func>
     Action::ItrType RvvMaskInsts::vmlHandler_(pegasus::PegasusState* state,
                                               Action::ItrType action_it)
@@ -114,6 +128,18 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the RISC-V `vcpop.m` instruction, which counts the number of active mask bits.
+     *
+     * This function implements the `vcpop.m` instruction, which counts the number of bits
+     * set to `1` in a mask register. The result is written to a destination scalar register.
+     * This operation is typically used to determine the number of active elements in a vector
+     * operation based on the mask.
+     *
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <typename XLEN>
     Action::ItrType RvvMaskInsts::vcpHandler_(pegasus::PegasusState* state,
                                               Action::ItrType action_it)
@@ -142,6 +168,19 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the RISC-V `vfirst.m` instruction, which finds the index of the first active
+     * mask bit.
+     *
+     * This function implements the `vfirst.m` instruction, which scans a mask register to find
+     * the index of the first bit set to `1`. If no bits are set, the result is `-1`. The result
+     * is written to a destination scalar register. This operation is typically used to identify
+     * the first active element in a vector operation.
+     *
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <typename XLEN>
     Action::ItrType RvvMaskInsts::vfirstHandler_(pegasus::PegasusState* state,
                                                  Action::ItrType action_it)
@@ -176,6 +215,24 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the RISC-V `vsxf` instruction, which performs Vector Mask Set-sfMode
+     * instruction
+     *
+     * This function set active bits in destination mask register under the control of mask register
+     * `v0`.
+     *
+     * The `sfMode` template argument determines the active mode for the bits:
+     * - **"including"**: Includes the current element in the detection.
+     * - **"before"**: Considers only elements before the current one.
+     * - **"only"**: Considers only the current element.
+     *
+     * @tparam sfMode The detection mode, which determines how bit is selected for the operation
+     *                (e.g., "including", "before", or "only").
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <RvvMaskInsts::SetFirstMode sfMode>
     Action::ItrType RvvMaskInsts::vsxfHandler_(pegasus::PegasusState* state,
                                                Action::ItrType action_it)
@@ -208,7 +265,7 @@ namespace pegasus
             MaskElement::ValueType value = 0;
             for (auto bit_iter = elem_vs2.begin(); bit_iter != elem_vs2.end(); ++bit_iter)
             {
-                // 1 found in current element, compost *value*
+                // 1 found in current element, compose *value*
                 found = true;
                 size_t idx = bit_iter.getIndex();
                 if constexpr (sfMode == SetFirstMode::BEFORE)
@@ -243,64 +300,55 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the RISC-V `viota.m` instruction, which performs index population based on
+     * active mask bits.
+     *
+     * This function implements the `viota.m` instruction, which generates a vector of indices
+     * based on the active bits in a mask register. For each active bit (set to `1`) in the mask
+     * register, the corresponding element in the destination vector register is populated with
+     * the count of preceding active bits. Inactive bits (set to `0`) result in a value of `0`
+     * in the destination vector.
+     *
+     * @tparam elemWidth The width of each vector element (e.g., 8, 16, 32, or 64 bits). Specifies
+     * the size of the vector elements being accessed.
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <size_t elemWidth>
     Action::ItrType viotaHelper(pegasus::PegasusState* state, Action::ItrType action_it)
     {
         using ElemsType = Elements<Element<elemWidth>, false>;
 
         const PegasusInstPtr inst = state->getCurrentInst();
-        MaskElements elems_vs2{state, inst->getVectorConfig(), inst->getRs2()};
-        MaskElements elems_v0{state, inst->getVectorConfig(), pegasus::V0};
+        ElemsType elems_vs2{state, inst->getVectorConfig(), inst->getRs2()};
+        ElemsType elems_v0{state, inst->getVectorConfig(), pegasus::V0};
         ElemsType elems_vd{state, inst->getVectorConfig(), inst->getRd()};
         size_t count = 0;
-        auto iter_v0 = elems_v0.maskBitIterBegin();
-        auto iter_vd = elems_vd.begin();
-
-        auto execute = [&](auto & iter, const auto & iter_end)
-        {
-            for (; iter != iter_end; ++iter)
-            {
-                elems_vd.getElement(iter.getIndex()).setVal(count);
-            }
-        };
+        const bool masked = !inst->getVM();
 
         for (auto elem_iter = elems_vs2.begin(); elem_iter != elems_vs2.end(); ++elem_iter)
         {
-            size_t index = elem_iter.getIndex();
-            auto elem_v0{elems_v0.getElement(index)};
-            auto elem_vs2{elems_vs2.getElement(index)};
+            size_t count_it = 0;
+            const auto mask_val = elems_v0.getElement(elem_iter.getIndex()).getVal();
+            const auto vs2_val = elems_vs2.getElement(elem_iter.getIndex()).getVal();
+            if (masked || (false == masked && mask_val))
+            {
+                if (0 != (vs2_val & 0x1))
+                {
+                    ++count_it;
+                }
+            }
 
-            if (!inst->getVM())
+            if ((false == masked) && !mask_val)
             {
-                elem_vs2.pokeVal(elem_vs2.getVal() & elem_v0.getVal()); // don't store *elem_vs2*
+                continue;
             }
-            for (auto bit_iter = elem_vs2.begin(); bit_iter != elem_vs2.end(); ++bit_iter)
-            {
-                size_t idx = bit_iter.getIndex();
-                // update parallel prefix sun for each active element of vd till current index
-                if (!inst->getVM()) // masked
-                {
-                    execute(iter_v0,
-                            MaskBitIterator{&elems_v0,
-                                            MaskElements::ElemType::elem_width * index + idx + 1});
-                }
-                else
-                {
-                    typename ElemsType::ElementIterator iter_end{
-                        &elems_vd, MaskElements::ElemType::elem_width * index + idx + 1};
-                    execute(iter_vd, iter_end);
-                }
-                ++count;
-            }
-            // fill in the sum till tail is reached
-            if (!inst->getVM()) // masked
-            {
-                execute(iter_v0, elems_v0.maskBitIterEnd());
-            }
-            else
-            {
-                execute(iter_vd, elems_vd.end());
-            }
+
+            elems_vd.getElement(elem_iter.getIndex()).setVal(count);
+
+            count += count_it;
         }
 
         return ++action_it;
@@ -331,6 +379,16 @@ namespace pegasus
         return ++action_it;
     }
 
+    /**
+     * @brief Handles the RISC-V `vid.v` instruction, which generates element indices for active
+     * elements.
+     *
+     * @tparam elemWidth The width of each vector element (e.g., 8, 16, 32, or 64 bits). Specifies
+     * the size of the vector elements being accessed.
+     * @param state Pointer to the current PegasusState, which holds the processor state.
+     * @param action_it Iterator pointing to the current action in the action list.
+     * @return Action::ItrType Iterator pointing to the next action in the action list.
+     */
     template <size_t elemWidth>
     Action::ItrType veiHelper(pegasus::PegasusState* state, Action::ItrType action_it)
     {

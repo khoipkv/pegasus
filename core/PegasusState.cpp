@@ -72,10 +72,34 @@ namespace pegasus
         }
     }
 
+    uint32_t getVLENB(const uint32_t vlenb_param,
+                      const mavis::extension_manager::riscv::RISCVExtensionManager & ext_man)
+    {
+        if (0 == vlenb_param)
+        {
+            std::array<std::pair<std::string, uint32_t>, 6> min_lengh_extensions{
+                {{"zvl32b", 32},
+                 {"zvl64b", 64},
+                 {"zvl128b", 128},
+                 {"zvl256b", 256},
+                 {"zvl512b", 512},
+                 {"zvl1024b", 1024}}};
+
+            for (auto & ext : min_lengh_extensions)
+            {
+                if (ext_man.isEnabled(ext.first))
+                {
+                    return ext.second;
+                }
+            }
+            return 256; // default
+        }
+        return vlenb_param;
+    }
+
     PegasusState::PegasusState(sparta::TreeNode* hart_tn, const PegasusStateParameters* p) :
         sparta::Unit(hart_tn),
         hart_id_(p->hart_id),
-        vlen_(p->vlen),
         reg_json_file_path_(p->reg_json_file_path),
         ilimit_(getInstLimit(hart_tn->getRoot(), p->ilimit)),
         quantum_(p->quantum),
@@ -102,6 +126,7 @@ namespace pegasus
                              ->getParameterValueAs<std::string>("uarch_file_path")),
         extension_manager_(mavis::extension_manager::riscv::RISCVExtensionManager::fromISA(
             isa_string_, isa_file_path_ + std::string("/riscv_isa_spec.json"), isa_file_path_)),
+        vlen_(getVLENB(p->vlen, extension_manager_)),
         hypervisor_enabled_(extension_manager_.isEnabled("h")),
         zicntr_enabled_(extension_manager_.isEnabled("zicntr")),
         inst_logger_(hart_tn, "inst", "Pegasus Instruction Logger"),
@@ -126,6 +151,15 @@ namespace pegasus
         }
 
         setPcAlignment_();
+
+        // Nice warning in case someone is using zvl1024b extension
+        // AND didn't change/muck with the vlen parameter
+        if (extension_manager_.isEnabled("zvl1024b") && (vlen_ != 1024))
+        {
+            std::cout
+                << "PEGASUS: Warning: vlen parameter overridden even though zvl1024b is provided"
+                << std::endl;
+        }
 
         // Set up register sets
         const std::string reg_json_file_path =
@@ -1308,6 +1342,17 @@ namespace pegasus
         static_assert(sizeof(XLEN) == 4 || sizeof(XLEN) == 8);
 
         Rvzicsrind::addCSRRegisterCallbacks<XLEN>(this);
+    }
+
+    void PegasusState::dumpDebugContent_(std::ostream & output) const
+    {
+        output << "HartID  : " << hart_id_ << std::endl;
+        output << "PC      : " << HEX16(pc_) << std::endl;
+        output << "NEXT PC : " << HEX16(next_pc_) << std::endl;
+        output << "PRIV    : " << priv_mode_ << std::endl;
+        output << "VIRT    : " << virtual_mode_ << std::endl;
+        output << "EXCEPT  : " << HEX8(current_exception_) << std::endl;
+        output << "VEC CFG : " << vector_config_ << std::endl;
     }
 
 } // namespace pegasus
