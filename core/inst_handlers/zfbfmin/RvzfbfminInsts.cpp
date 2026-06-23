@@ -16,12 +16,12 @@ namespace pegasus
 
         (void)inst_handlers;
         inst_handlers.emplace(
-            "fcvt_bf16_s", pegasus::Action::createAction<&RvzfbfminInsts::fcvt_bf16_sHandler_<XLEN>,
+            "fcvt.bf16.s", pegasus::Action::createAction<&RvzfbfminInsts::fcvt_bf16_sHandler_<XLEN>,
                                                          RvzfbfminInsts>(nullptr, "fcvt_bf16_s",
                                                                          ActionTags::EXECUTE_TAG));
 
         inst_handlers.emplace(
-            "fcvt_s_bf16", pegasus::Action::createAction<&RvzfbfminInsts::fcvt_s_bf16Handler<XLEN>,
+            "fcvt.s.bf16", pegasus::Action::createAction<&RvzfbfminInsts::fcvt_s_bf16Handler<XLEN>,
                                                          RvzfbfminInsts>(nullptr, "fcvt_s_bf16",
                                                                          ActionTags::EXECUTE_TAG));
     }
