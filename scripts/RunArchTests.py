@@ -276,7 +276,7 @@ def run(tests, output_dir, serial=False):
 
 
 def report_results(passing_tests, failing_tests, timeout_tests):
-    num_tests = len(passing_tests) + len(failing_tests) + len(failing_tests)
+    num_tests = len(passing_tests) + len(failing_tests) + len(timeout_tests)
     num_passed = 0
     if passing_tests:
         print("PASSED:")
